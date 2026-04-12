@@ -1,0 +1,83 @@
+name: CI-CD Pipeline
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+
+  train:
+    runs-on: ubuntu-latest
+
+    outputs:
+      mse: ${{ steps.extract.outputs.mse }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install pandas scikit-learn joblib
+
+      - name: Run training
+        run: python scripts/train.py
+
+      - name: Extract MSE
+        id: extract
+        run: |
+          MSE=$(python -c "import json; print(json.load(open('metrics.json'))['mse'])")
+          echo "mse=$MSE" >> $GITHUB_OUTPUT
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-artifacts
+          path: |
+            model.pkl
+            metrics.json
+
+  deploy:
+    needs: train
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: model-artifacts
+
+      - name: Compare metrics
+        id: compare
+        run: |
+          CURRENT=${{ needs.train.outputs.mse }}
+          BEST=${{ vars.BEST_MSE }}
+
+          echo "Current: $CURRENT"
+          echo "Best: $BEST"
+
+          if (( $(echo "$CURRENT < $BEST" | bc -l) )); then
+            echo "improved=true" >> $GITHUB_ENV
+          else
+            echo "improved=false" >> $GITHUB_ENV
+          fi
+
+      - name: Stop if not improved
+        if: env.improved == 'false'
+        run: |
+          echo "2022BCS0061 ---- Metric did not improve"
+          exit 0
+
+      - name: Login Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build Docker Image
+        run: docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/lab4:v1 .
+
+      - name: Push Docker Image
+        run: docker push ${{ secrets.DOCKERHUB_USERNAME }}/lab4:v1
