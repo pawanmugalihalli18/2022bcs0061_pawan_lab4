@@ -1,0 +1,84 @@
+pipeline {
+    agent any
+
+    environment {
+        IMAGE = "thisispawankumar/lab4:v1"
+        CONTAINER = "test_container"
+        PORT = "8000"
+    }
+
+    stages {
+
+        stage('Pull Image') {
+            steps {
+                sh 'docker pull $IMAGE'
+            }
+        }
+
+        stage('Run Container') {
+            steps {
+                sh '''
+                docker run -d -p 8000:8000 --name $CONTAINER $IMAGE
+                '''
+            }
+        }
+
+        stage('Wait for Service') {
+            steps {
+                sh '''
+                for i in {1..10}
+                do
+                    sleep 3
+                    curl -s http://localhost:8000/docs && break
+                done
+                '''
+            }
+        }
+
+        stage('Valid Request Test') {
+            steps {
+                sh '''
+                RESPONSE=$(curl -s -X POST http://localhost:8000/predict \
+                -H "Content-Type: application/json" \
+                -d '{"fixed acidity":7.4,"volatile acidity":0.7,"citric acid":0.0,"residual sugar":1.9,"chlorides":0.076,"free sulfur dioxide":11,"total sulfur dioxide":34,"density":0.9978,"pH":3.51,"sulphates":0.56,"alcohol":9.4}')
+
+                echo "Valid Response: $RESPONSE"
+
+                echo $RESPONSE | grep "wine_quality" || exit 1
+                '''
+            }
+        }
+
+        stage('Invalid Request Test') {
+            steps {
+                sh '''
+                RESPONSE=$(curl -s -X POST http://localhost:8000/predict \
+                -H "Content-Type: application/json" \
+                -d '{"fixed acidity":7.4}')
+
+                echo "Invalid Response: $RESPONSE"
+
+                echo $RESPONSE | grep "error" || exit 1
+                '''
+            }
+        }
+
+        stage('Stop Container') {
+            steps {
+                sh '''
+                docker stop $CONTAINER
+                docker rm $CONTAINER
+                '''
+            }
+        }
+    }
+
+    post {
+        failure {
+            echo "❌ Pipeline Failed"
+        }
+        success {
+            echo "✅ Pipeline Passed"
+        }
+    }
+}
