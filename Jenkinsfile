@@ -8,12 +8,6 @@ pipeline {
 
     stages {
 
-        stage('Clone Repo') {
-            steps {
-                git 'https://github.com/pawanmugalihalli18/2022bcs0061_pawan_lab4.git'
-            }
-        }
-
         stage('Install Dependencies') {
             steps {
                 sh 'pip3 install pandas scikit-learn joblib'
