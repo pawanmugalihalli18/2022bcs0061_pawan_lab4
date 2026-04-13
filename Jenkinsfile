@@ -3,14 +3,14 @@ pipeline {
 
     environment {
         DOCKER_USER = "thisispawankumar"
-        IMAGE_NAME = "lab5"
+        IMAGE_NAME = "lab4"
     }
 
     stages {
 
         stage('Clone Repo') {
             steps {
-                git 'YOUR_GITHUB_REPO_URL'
+                git 'https://github.com/pawanmugalihalli18/2022bcs0061_pawan_lab4.git'
             }
         }
 
