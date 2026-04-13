@@ -10,7 +10,11 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'pip3 install pandas scikit-learn joblib'
+                sh '''
+                python3 -m venv venv
+                . venv/bin/activate
+                pip install pandas scikit-learn joblib
+                '''
             }
         }
 
